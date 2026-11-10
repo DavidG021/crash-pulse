@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrashPulse // Quantitative Risk Engine</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #06080f;
+            --bg-panel: #0d1322;
+            --border-color: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #64748b;
+            --accent-cyan: #06b6d4;
+            --accent-yellow: #f59e0b;
+            --accent-purple: #a855f7;
+            --danger-red: #ef4444;
+            --font-main: 'Plus Jakarta Sans', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 24px 16px;
+            min-height: 100vh;
+        }
+
+        .terminal-container {
+            max-width: 1080px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            padding: 14px 20px;
+            border-radius: 8px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            font-family: var(--font-mono);
+            font-weight: 800;
+            font-size: 1rem;
+            color: var(--accent-cyan);
+            background: rgba(6, 182, 212, 0.1);
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(6, 182, 212, 0.2);
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .status-indicator {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background-color: var(--danger-red);
+        }
+
+        .status-indicator.connected {
+            background-color: #10b981;
+            box-shadow: 0 0 8px #10b981;
+        }
+
+        .risk-banner {
+            display: none;
+            background-color: rgba(239, 68, 68, 0.08);
+            border-left: 3px solid var(--danger-red);
+            border-top: 1px solid rgba(239, 68, 68, 0.2);
+            border-right: 1px solid rgba(239, 68, 68, 0.2);
+            border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            padding: 12px 18px;
+            border-radius: 0 6px 6px 0;
+            margin-bottom: 20px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            animation: alertPulse 2s infinite;
+        }
+
+        @keyframes alertPulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .data-card {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            position: relative;
+        }
+
+        .data-card::after {
+            content: ''; position: absolute;
+            top: 0; left: 0; width: 2px; height: 100%;
+            background: var(--border-color);
+        }
+
+        .data-card.accent-yellow::after { background: var(--accent-yellow); }
+        .data-card.accent-red::after { background: var(--danger-red); }
+        .data-card.accent-cyan::after { background: var(--accent-cyan); }
+        .data-card.accent-purple::after { background: var(--accent-purple); }
+
+        .card-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 6px;
+        }
+
+        .card-metric {
+            font-family: var(--font-mono);
+            font-size: 1.6rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .card-metric.yellow { color: var(--accent-yellow); }
+        .card-metric.red { color: #f87171; }
+        .card-metric.cyan { color: var(--accent-cyan); }
+        .card-metric.purple { color: #c084fc; }
+
+        .control-panel {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 18px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input[type="number"] {
+            background-color: var(--bg-base);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            width: 120px;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+        }
+
+        .btn {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-cyan);
+            color: var(--bg-base);
+            border-color: var(--accent-cyan);
+        }
+
+        .btn-primary:hover { opacity: 0.9; }
+
+        .btn-quick {
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+        }
+
+        .btn-quick:hover {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 850px) {
+            .main-layout { grid-template-columns: 1fr; }
+        }
+
+        .section-box {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 18px;
+        }
+
+        .section-header {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 12px;
+        }
+
+        .history-stream {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            margin-bottom: 20px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+
+        .badge {
+            font-family: var(--font-mono);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.78rem;
+            min-width: 52px;
+            text-align: center;
+            flex-shrink: 0;
+            border: 1px solid transparent;
+        }
+
+        .badge-low { background: rgba(239, 68, 68, 0.1); color: #f87171; border-color: rgba(239, 68, 68, 0.25); }
+        .badge-mid { background: rgba(59, 130, 246, 0.1); color: #60a5fa; border-color: rgba(59, 130, 246, 0.25); }
+        .badge-high { background: rgba(168, 85, 247, 0.1); color: #c084fc; border-color: rgba(168, 85, 247, 0.25); }
+
+        .audit-log {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 260px;
+            overflow-y: auto;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+        }
+
+        .audit-item {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border-color);
+            color: #fca5a5;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .audit-item:last-child { border-bottom: none; }
+        .audit-time { color: var(--text-secondary); }
+    </style>
+</head>
+<body>
+
+    <div class="terminal-container">
+        <header>
+            <div class="brand">
+                <div class="brand-logo">CRASH//PULSE</div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary);">Quantitative Risk Engine</div>
+            </div>
+            <div class="connection-status">
+                <span id="statusText">OFFLINE</span>
+                <span id="statusDot" class="status-indicator"></span>
+            </div>
+        </header>
+
+        <div class="risk-banner" id="riskBox">
+            <span id="riskText">⚠️ SYSTEM WARNING: Risk threshold exceeded.</span>
+        </div>
+
+        <div class="control-panel">
+            <div class="section-header" style="margin-bottom: 0; width: 100%;">Modo de Ingesta Manual (Analista)</div>
+            <div class="control-group">
+                <input type="number" id="manualInput" step="0.01" min="1.00" placeholder="Ej. 1.85">
+                <button class="btn btn-primary" onclick="sendManualRound()">Registrar Ronda</button>
+            </div>
+            <div class="control-group">
+                <span style="font-size: 0.75rem; color: var(--text-secondary); font-family: var(--font-mono);">Accesos rápidos:</span>
+                <button class="btn btn-quick" onclick="quickSend(1.20)">1.20x</button>
+                <button class="btn btn-quick" onclick="quickSend(1.50)">1.50x</button>
+                <button class="btn btn-quick" onclick="quickSend(1.95)">1.95x</button>
+                <button class="btn btn-quick" onclick="quickSend(3.50)">3.50x</button>
+                <button class="btn btn-quick" onclick="quickSend(10.00)">10.0x</button>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="data-card accent-yellow">
+                <div class="card-label">Último Valor</div>
+                <div class="card-metric yellow" id="latestValue">0.00x</div>
+            </div>
+            <div class="data-card accent-red">
+                <div class="card-label">Racha Bajista</div>
+                <div class="card-metric red" id="streakValue">0</div>
+            </div>
+            <div class="data-card accent-purple">
+                <div class="card-label">Dominio &lt; 2.0x (20r)</div>
+                <div class="card-metric purple" id="bearishPct">0%</div>
+            </div>
+            <div class="data-card accent-cyan">
+                <div class="card-label">Promedio Móvil</div>
+                <div class="card-metric cyan" id="movingAvg">0.00x</div>
+            </div>
+            <div class="data-card accent-cyan">
+                <div class="card-label">Total Rondas</div>
+                <div class="card-metric cyan" id="totalRounds">0</div>
+            </div>
+        </div>
+
+        <div class="section-box" style="margin-bottom: 16px;">
+            <div class="section-header">Registro Secuencial de Rondas</div>
+            <div class="history-stream" id="historyContainer"></div>
+        </div>
+
+        <div class="main-layout">
+            <div class="section-box">
+                <div class="section-header">Gráfico de Tendencia en Vivo</div>
+                <canvas id="realtimeChart" height="120"></canvas>
+            </div>
+            <div class="section-box">
+                <div class="section-header">Auditoría de Alertas Críticas</div>
+                <ul class="audit-log" id="auditLog">
+                    <li class="audit-item" style="color: var(--text-secondary);">Esperando eventos de riesgo...</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const protocol = window.location.protocol === 'https:' ? 'https://' : 'http://';
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const host = window.location.host;
+
+        const API_BASE = `${protocol}${host}`;
+        const WS_URL = `${wsProtocol}${host}/ws/dashboard`;
+
+        const historyContainer = document.getElementById('historyContainer');
+        const latestValue = document.getElementById('latestValue');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const streakValue = document.getElementById('streakValue');
+        const totalRounds = document.getElementById('totalRounds');
+        const bearishPct = document.getElementById('bearishPct');
+        const movingAvg = document.getElementById('movingAvg');
+        const riskBox = document.getElementById('riskBox');
+        const riskText = document.getElementById('riskText');
+        const auditLog = document.getElementById('auditLog');
+        const manualInput = document.getElementById('manualInput');
+
+        let roundsCounter = 0;
+        let lastLoggedStreak = 0;
+
+        const ctx = document.getElementById('realtimeChart').getContext('2d');
+        const chartData = {
+            labels: [],
+            datasets: [{
+                label: 'Multiplicador',
+                data: [],
+                borderColor: '#06b6d4',
+                backgroundColor: 'rgba(6, 182, 212, 0.04)',
+                borderWidth: 1.5,
+                fill: true,
+                tension: 0.2,
+                pointRadius: 2.5,
+                pointBackgroundColor: '#06b6d4'
+            }]
+        };
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } } },
+                    x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } } }
+                }
+            }
+        });
+
+        async function sendRoundData(multiplierVal) {
+            if (isNaN(multiplierVal) || multiplierVal <= 0) return;
+            try {
+                const response = await fetch(`${API_BASE}/api/round`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ multiplier: parseFloat(multiplierVal) })
+                });
+                const result = await response.json();
+                if (result.status !== 'success') {
+                    console.error("Error al registrar ronda:", result.detail);
+                }
+            } catch (error) {
+                console.error("Error de red al enviar ronda:", error);
+            }
+        }
+
+        function sendManualRound() {
+            const val = manualInput.value;
+            if (val) {
+                sendRoundData(val);
+                manualInput.value = '';
+            }
+        }
+
+        function quickSend(val) {
+            sendRoundData(val);
+        }
+
+        function logRiskEvent(streakCount) {
+            if (streakCount < 4 || streakCount === lastLoggedStreak) return;
+            lastLoggedStreak = streakCount;
+
+            if (auditLog.children.length === 1 && auditLog.children[0].innerText.includes('Esperando')) {
+                auditLog.innerHTML = '';
+            }
+
+            const timeStr = new Date().toLocaleTimeString();
+            const li = document.createElement('li');
+            li.className = 'audit-item';
+            li.innerHTML = `<span>⚠️ Racha Peligrosa: ${streakCount} Rondas</span> <span class="audit-time">${timeStr}</span>`;
+            auditLog.insertBefore(li, auditLog.firstChild);
+        }
+
+        async function loadHistory() {
+            try {
+                const response = await fetch(`${API_BASE}/api/history`);
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    if (result.current_streak !== undefined) streakValue.innerText = result.current_streak;
+                    if (result.metrics) {
+                        bearishPct.innerText = result.metrics.bearish_pct + '%';
+                        movingAvg.innerText = result.metrics.moving_avg.toFixed(2) + 'x';
+                    }
+
+                    if (result.data && result.data.length > 0) {
+                        roundsCounter = result.data.length;
+                        totalRounds.innerText = roundsCounter;
+
+                        result.data.forEach(item => {
+                            const val = parseFloat(item.multiplier);
+                            const timeLabel = new Date(item.timestamp || item.created_at).toLocaleTimeString();
+
+                            chartData.labels.push(timeLabel);
+                            chartData.datasets[0].data.push(val);
+
+                            const badge = document.createElement('div');
+                            badge.className = 'badge ' + (val < 2.0 ? 'badge-low' : val < 10.0 ? 'badge-mid' : 'badge-high');
+                            badge.innerText = val.toFixed(2) + 'x';
+                            historyContainer.appendChild(badge);
+
+                            latestValue.innerText = val.toFixed(2) + 'x';
+                        });
+                        chart.update();
+                    }
+                }
+            } catch (error) {
+                console.error("Error al cargar el historial:", error);
+            }
+        }
+
+        function connectWebSocket() {
+            const ws = new WebSocket(WS_URL);
+
+            ws.onopen = () => {
+                statusDot.classList.add('connected');
+                statusText.innerText = "LIVE STREAM";
+            };
+
+            ws.onclose = () => {
+                statusDot.classList.remove('connected');
+                statusText.innerText = "OFFLINE";
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                const val = parseFloat(data.multiplier);
+
+                latestValue.innerText = val.toFixed(2) + 'x';
+                streakValue.innerText = data.low_streak;
+                roundsCounter++;
+                totalRounds.innerText = roundsCounter;
+
+                if (data.bearish_pct !== undefined) bearishPct.innerText = data.bearish_pct + '%';
+                if (data.moving_avg !== undefined) movingAvg.innerText = data.moving_avg.toFixed(2) + 'x';
+
+                if (data.risk_alert) {
+                    riskBox.style.display = 'block';
+                    riskText.innerText = data.risk_alert;
+                    logRiskEvent(data.low_streak);
+                } else {
+                    riskBox.style.display = 'none';
+                    lastLoggedStreak = 0;
+                }
+
+                const badge = document.createElement('div');
+                badge.className = 'badge ' + (val < 2.0 ? 'badge-low' : val < 10.0 ? 'badge-mid' : 'badge-high');
+                badge.innerText = val.toFixed(2) + 'x';
+                historyContainer.insertBefore(badge, historyContainer.firstChild);
+
+                const timeLabel = new Date(data.timestamp).toLocaleTimeString();
+                chartData.labels.push(timeLabel);
+                chartData.datasets[0].data.push(val);
+
+                if (chartData.labels.length > 20) {
+                    chartData.labels.shift();
+                    chartData.datasets[0].data.shift();
+                }
+                chart.update();
+            };
+        }
+
+        loadHistory();
+        connectWebSocket();
+    </script>
+</body>
+</html>
