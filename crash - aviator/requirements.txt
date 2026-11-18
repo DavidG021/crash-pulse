@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+websockets
+supabase
+pydantic
+python-dotenv
